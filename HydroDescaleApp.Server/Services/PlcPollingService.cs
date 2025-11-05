@@ -15,7 +15,6 @@ public class PlcPollingService : BackgroundService
     private readonly IOracleService _oracleService;
     private readonly string _plcIp;
     private readonly int _dbNumber = 550;
-    private readonly int _dbwWatchdog = 20;
     private readonly Dictionary<int, int> _positionMap = new()
     {
         { 0, 59 }, // DBX0.0 -> pos 59 (left, furnace 1)
@@ -25,6 +24,9 @@ public class PlcPollingService : BackgroundService
         { 4, 65 }, // DBX0.4 -> pos 65 (left, furnace 3)
         { 5, 67 }  // DBX0.5 -> pos 67 (right, furnace 3)
     };
+
+    // <-- Теперь отслеживаем изменение байта, а не watchdog
+    private byte? _lastByteValue = null;
 
     public PlcPollingService(
         ILogger<PlcPollingService> logger,
@@ -36,13 +38,16 @@ public class PlcPollingService : BackgroundService
         _context = context;
         _oracleService = oracleService;
         _plcIp = configuration["Plc:ReadIp"] ?? "127.0.0.1";
+        _configuration = configuration;
     }
+
+    private readonly IConfiguration _configuration;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("PlcPollingService is starting.");
 
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2)); // Poll every 2 seconds
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500)); // Частый опрос для отслеживания изменений
 
         while (!stoppingToken.IsCancellationRequested && await timer.WaitForNextTickAsync(stoppingToken))
         {
@@ -66,13 +71,24 @@ public class PlcPollingService : BackgroundService
         {
             await plc.OpenAsync();
 
-            // Read DB550.DBX0.0 - DBX0.5 (first 1 byte)
-            var dbData = (byte)plc.Read($"{_dbNumber}.DBB0");
+            // Read DB550.DBB0 (contains DBX0.0 - DBX0.5)
+            var currentByteValue = (byte)plc.Read($"{_dbNumber}.DBB0");
 
+            // Check if byte value has changed
+            if (_lastByteValue.HasValue && _lastByteValue.Value == currentByteValue)
+            {
+                // Байт не изменился, выходим
+                return;
+            }
+
+            _logger.LogDebug("DBB0 changed from {_lastByteValue} to {currentByteValue}", _lastByteValue, currentByteValue);
+            _lastByteValue = currentByteValue;
+
+            // Если байт изменился, ищем активный бит
             int? activeBit = null;
             for (int i = 0; i < 6; i++)
             {
-                if ((dbData & (1 << i)) != 0)
+                if ((currentByteValue & (1 << i)) != 0)
                 {
                     activeBit = i;
                     break;
@@ -82,7 +98,7 @@ public class PlcPollingService : BackgroundService
             if (activeBit.HasValue)
             {
                 var pos = _positionMap[activeBit.Value];
-                _logger.LogInformation("Active bit {Bit}, corresponding to position {Pos}", activeBit.Value, pos);
+                _logger.LogInformation("Event: Active bit {Bit} changed, corresponding to position {Pos}", activeBit.Value, pos);
 
                 var steelGrade = await _oracleService.GetSteelGradeByPositionAsync(pos);
                 if (!string.IsNullOrEmpty(steelGrade))
@@ -114,7 +130,10 @@ public class PlcPollingService : BackgroundService
             }
             else
             {
-                _logger.LogDebug("No active bit found in DB550.DBX0.0 - DBX0.5.");
+                // Байт изменился, но ни один из интересующих битов не установлен.
+                // Это может быть, например, если установился бит 6 или 7, или все сброшены.
+                // Логируем, если это важно для отладки.
+                _logger.LogDebug("DBB0 changed, but no active bit found in DBX0.0 - DBX0.5. Current value: {currentByteValue}", currentByteValue);
             }
         }
         catch (Exception ex)
