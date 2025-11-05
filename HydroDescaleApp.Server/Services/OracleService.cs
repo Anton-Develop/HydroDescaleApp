@@ -7,6 +7,7 @@ namespace HydroDescaleApp.Server.Services
   {
     Task<List<string>> GetSteelGradesAsync();
     Task<string?> GetSteelGradeByFurnaceAsync(int furnaceNumber);
+    Task<string?> GetSteelGradeByPositionAsync(int position);
   }
 
   public class OracleService : IOracleService
@@ -46,5 +47,16 @@ namespace HydroDescaleApp.Server.Services
       var result = await command.ExecuteScalarAsync();
       return result?.ToString();
     }
+    public async Task<string?> GetSteelGradeByPositionAsync(int position)
+{
+    using var connection = new OracleConnection(_connectionString);
+    await connection.OpenAsync();
+
+    using var command = new OracleCommand("SELECT SteelGrade FROM View_Descaling_Servise WHERE pos = :pos", connection);
+    command.Parameters.Add(new OracleParameter("pos", OracleDbType.Int32) { Value = position });
+
+    var result = await command.ExecuteScalarAsync();
+    return result?.ToString();
+}
   }
 }
