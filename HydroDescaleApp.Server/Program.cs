@@ -21,6 +21,7 @@ namespace HydroDescaleApp.Server
 
       builder.Services.AddScoped<IOracleService, OracleService>();
       builder.Services.AddScoped<IPlcService, PlcService>();
+      builder.Services.AddHostedService<PlcPollingService>();
 
       var app = builder.Build();
 
