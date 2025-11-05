@@ -5,7 +5,7 @@ namespace HydroDescaleApp.Server.Services
 {
   public interface IPlcService
   {
-    Task<int> ReadFurnaceNumberAsync();
+   // Task<int> ReadFurnaceNumberAsync();
     Task WriteDescaleSettingsAsync(int pumps, double pressure);
   }
 
@@ -23,7 +23,7 @@ namespace HydroDescaleApp.Server.Services
       _plcIpWrite = configuration["Plc:WriteIp"] ?? "127.0.0.1";
     }
 
-    public async Task<int> ReadFurnaceNumberAsync()
+   /* public async Task<int> ReadFurnaceNumberAsync()
     {
       using var plc = new Plc(CpuType.S7400, _plcIpRead, 0, 2);
       try
@@ -38,7 +38,7 @@ namespace HydroDescaleApp.Server.Services
         return 0;
       }
     }
-
+*/
     public async Task WriteDescaleSettingsAsync(int pumps, double pressure)
     {
       using var plc = new Plc(CpuType.S7400, _plcIpWrite, 0, 2);

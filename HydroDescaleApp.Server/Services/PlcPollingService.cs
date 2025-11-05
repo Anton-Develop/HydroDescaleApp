@@ -47,7 +47,7 @@ public class PlcPollingService : BackgroundService
     {
         _logger.LogInformation("PlcPollingService is starting.");
 
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500)); // Частый опрос для отслеживания изменений
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(2000)); // Частый опрос для отслеживания изменений
 
         while (!stoppingToken.IsCancellationRequested && await timer.WaitForNextTickAsync(stoppingToken))
         {
@@ -66,7 +66,7 @@ public class PlcPollingService : BackgroundService
 
     private async Task PollPlcAsync()
     {
-        using var plc = new Plc(CpuType.S7400, _plcIp, 0, 65535);
+        using var plc = new Plc(CpuType.S7400, _plcIp, 0, 2);
         try
         {
             await plc.OpenAsync();
@@ -112,15 +112,16 @@ public class PlcPollingService : BackgroundService
                     {
                         _logger.LogInformation("Settings found: Pumps={Pumps}, Pressure={Pressure}", settings.NumberOfPumps, settings.PressureSetting);
 
-                        // Send to PLC
-                        var plcService = new PlcService(_configuration);
-                        await plcService.WriteDescaleSettingsAsync(settings.NumberOfPumps, settings.PressureSetting);
+                        // Send to PLC Закомментим пока не будет создано правильной DB
+                      //  var plcService = new PlcService(_configuration);
+                      //  await plcService.WriteDescaleSettingsAsync(settings.NumberOfPumps, settings.PressureSetting);
                     }
                     else
                     {
                         _logger.LogWarning("No settings found for steel grade '{Grade}', using defaults.", steelGrade);
-                        var plcService = new PlcService(_configuration);
-                        await plcService.WriteDescaleSettingsAsync(2, 18.3); // defaults
+                        // Send to PLC Закомментим пока не будет создано правильной DB
+                       // var plcService = new PlcService(_configuration);
+                       // await plcService.WriteDescaleSettingsAsync(2, 18.3); // defaults
                     }
                 }
                 else
