@@ -6,7 +6,7 @@ namespace HydroDescaleApp.Server.Services
   public interface IOracleService
   {
     Task<List<string>> GetSteelGradesAsync();
-    Task<string?> GetSteelGradeByFurnaceAsync(int furnaceNumber);
+    //Task<string?> GetSteelGradeByFurnaceAsync(int furnaceNumber);
     Task<string?> GetSteelGradeByPositionAsync(int position);
   }
 
