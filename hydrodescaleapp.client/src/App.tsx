@@ -1,14 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Container, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, TextField, Box } from '@mui/material';
+import { Container, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, TextField, Box, Alert } from '@mui/material';
 import { SteelGrade } from './types';
+
+interface PlcStatus {
+  isConnected: boolean;
+  lastSuccessfulWrite: string;
+  lastErrorMessage: string;
+}
 
 const App = () => {
   const [steelGrades, setSteelGrades] = useState<SteelGrade[]>([]);
   const [newGrade, setNewGrade] = useState<Omit<SteelGrade, 'id'>>({ SteelGradeName: '', NumberOfPumps: 2, PressureSetting: 18.3 });
+  const [plcStatus, setPlcStatus] = useState<PlcStatus | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSteelGrades();
+    const interval = setInterval(() => {
+      fetchPlcStatus();
+    }, 5000); // Обновляем статус PLC каждые 5 секунд
+
+    return () => clearInterval(interval);
   }, []);
 
   const fetchSteelGrades = async () => {
@@ -16,6 +29,17 @@ const App = () => {
       const res = await axios.get<SteelGrade[]>('http://localhost:5000/api/steelgrades');
       setSteelGrades(res.data);
     } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchPlcStatus = async () => {
+    try {
+      const res = await axios.get<PlcStatus>('http://localhost:5000/api/plcstatus');
+      setPlcStatus(res.data);
+      setStatusError(null);
+    } catch (err) {
+      setStatusError('Failed to fetch PLC status');
       console.error(err);
     }
   };
@@ -42,6 +66,23 @@ const App = () => {
   return (
     <Container>
       <Typography variant="h4" gutterBottom>Steel Grades Management</Typography>
+
+      {/* Статус PLC */}
+      {plcStatus && (
+        <Alert severity={plcStatus.isConnected ? "success" : "error"} style={{ marginBottom: '16px' }}>
+          PLC Status: {plcStatus.isConnected ? 'Connected' : 'Disconnected'}.
+          {plcStatus.isConnected ? (
+            <span> Last write: {new Date(plcStatus.lastSuccessfulWrite).toLocaleString()}</span>
+          ) : (
+            <span> Error: {plcStatus.lastErrorMessage}</span>
+          )}
+        </Alert>
+      )}
+      {statusError && (
+        <Alert severity="error" style={{ marginBottom: '16px' }}>
+          {statusError}
+        </Alert>
+      )}
 
       <Box my={2}>
         <TextField
