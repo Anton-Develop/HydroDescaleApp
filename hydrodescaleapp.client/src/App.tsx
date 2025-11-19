@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Container, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, TextField, Box, Alert } from '@mui/material';
 import { SteelGrade } from './types';
+import { Alert, ButtonGroup } from '@mui/material';
 
 interface PlcStatus {
   isConnected: boolean;
@@ -14,6 +15,31 @@ const App = () => {
   const [newGrade, setNewGrade] = useState<Omit<SteelGrade, 'id'>>({ SteelGradeName: '', NumberOfPumps: 2, PressureSetting: 18.3 });
   const [plcStatus, setPlcStatus] = useState<PlcStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [readResult, setReadResult] = useState<{ value: number; error?: string } | null>(null);
+  const [writeResult, setWriteResult] = useState<{ success: boolean; error?: string } | null>(null);
+
+  const handleReadFurnace = async () => {
+    try {
+      const res = await axios.get('http://localhost:5000/api/diagnostic/read-furnace');
+      setReadResult(res.data);
+      setWriteResult(null);
+    } catch (err: any) {
+      setReadResult({ error: err.response?.data?.error || 'Unknown error' });
+    }
+  };
+
+  const handleWriteTest = async () => {
+    try {
+      const res = await axios.post('http://localhost:5000/api/diagnostic/write-test', {
+        pumps: 2,
+        pressure: 18.3
+      });
+      setWriteResult(res.data);
+      setReadResult(null);
+    } catch (err: any) {
+      setWriteResult({ success: false, error: err.response?.data?.error || 'Unknown error' });
+    }
+  };
 
   useEffect(() => {
     fetchSteelGrades();
@@ -65,8 +91,27 @@ const App = () => {
 
   return (
     <Container>
-      <Typography variant="h4" gutterBottom>Steel Grades Management</Typography>
+      <Typography variant="h4" gutterBottom>Сервис для работы гидросбива</Typography>
+      {/* Кнопки диагностики */}
+      <Box my={2}>
+        <ButtonGroup variant="contained" aria-label="Diagnostic buttons">
+          <Button onClick={handleReadFurnace}>Read Furnace Number</Button>
+          <Button onClick={handleWriteTest}>Write Test Values</Button>
+        </ButtonGroup>
+      </Box>
 
+      {/* Результаты диагностики */}
+      {readResult && (
+        <Alert severity={readResult.error ? "error" : "info"} style={{ marginBottom: '16px' }}>
+          Read Result: {readResult.error ? `Error: ${readResult.error}` : `Value: ${readResult.value}`}
+        </Alert>
+      )}
+      {writeResult && (
+        <Alert severity={writeResult.success ? "success" : "error"} style={{ marginBottom: '16px' }}>
+          Write Result: {writeResult.success ? 'Success' : `Error: ${writeResult.error}`}
+        </Alert>
+      )}
+      
       {/* Статус PLC */}
       {plcStatus && (
         <Alert severity={plcStatus.isConnected ? "success" : "error"} style={{ marginBottom: '16px' }}>
