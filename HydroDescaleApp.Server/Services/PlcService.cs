@@ -32,20 +32,21 @@ public class PlcService : IPlcService
 
         try
         {
-            plc = new Plc(CpuType.S7400, _plcIpWrite, 0, 2);
+            plc = new Plc(CpuType.S7400, _plcIpWrite, 0, 3);
             await plc.OpenAsync();
 
             // Читаем текущее значение Watchdog (DB14.DBW0)
-            var currentWatchdog = (ushort)plc.Read($"{DBWrite}.DBW0");
+            var currentWatchdog = (ushort)plc.Read($"DB{DBWrite}.DBW0");
 
             // Увеличиваем watchdog на 1
             var newWatchdog = (ushort)((currentWatchdog + 1) & 0xFFFF);
 
             // Записываем новые значения
-            plc.Write($"{DBWrite}.DBW0", newWatchdog); // Watchdog
-            plc.Write($"{DBWrite}.DBW2", true); // Link_service_OK (BOOL) — устанавливаем в TRUE
-            plc.Write($"{DBWrite}.DBW4", (short)pumps); // Count_Pump_Furnace_DSC (INT)
-            plc.Write($"{DBWrite}.DBD6", (float)pressure); // Reference_PS_Furnace_DSC (REAL)
+            plc.Write($"DB{DBWrite}.DBW0", newWatchdog); // Watchdog
+            plc.Write($"DB{DBWrite}.DBW2", true); // Link_service_OK (BOOL) — устанавливаем в TRUE
+            plc.Write($"DB{DBWrite}.DBW4", (short)pumps); // Count_Pump_Furnace_DSC (INT)
+            plc.Write($"DB{DBWrite}.DBD6", (float)pressure); // Reference_PS_Furnace_DSC (REAL)
+            
 
             _logger.LogInformation("Successfully wrote to PLC: Watchdog={Watchdog}, Pumps={Pumps}, Pressure={Pressure}", newWatchdog, pumps, pressure);
             success = true;
@@ -71,9 +72,9 @@ public class PlcService : IPlcService
         Plc? plc = null;
         try
         {
-            plc = new Plc(CpuType.S7400, _plcIpWrite, 0, 2);
+            plc = new Plc(CpuType.S7400, _plcIpWrite, 0, 3);
             await plc.OpenAsync();
-            plc.Write($"{DBWrite}.DBW2", value); // Link_service_OK
+            plc.Write($"DB{DBWrite}.DBW2", value); // Link_service_OK
         }
         catch (Exception ex)
         {
@@ -87,11 +88,11 @@ public class PlcService : IPlcService
 
     public async Task<int> ReadFurnaceNumberAsync()
     {
-        using var plc = new Plc(CpuType.S7400, _plcIpWrite, 0, 2);
+        using var plc = new Plc(CpuType.S7400, _plcIpWrite, 0, 3);
         try
         {
             await plc.OpenAsync();
-            var value = (short)plc.Read($"{DBRead}.DBW0");
+            var value = (short)plc.Read($"DB{DBRead}.DBW0");
             return value;
         }
         catch (Exception ex)

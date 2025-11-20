@@ -24,11 +24,12 @@ public class DiagnosticService : IDiagnosticService
 
     public async Task<(bool success, short value, string error)> ReadFurnaceNumberAsync()
     {
-        using var plc = new Plc(CpuType.S7400, _plcReadIp, 0, 2);
+        using var plc = new Plc(CpuType.S7400, _plcReadIp, 0, 3);
         try
         {
             await plc.OpenAsync();
-            var value = (short)plc.Read("DB855.DBW0"); // Пример: читаем DB855.DBW0
+            var value1 = plc.Read("DB550.DBB0"); // Пример: читаем DB855.DBW0
+            var value = Convert.ToInt16(value1);
             _logger.LogInformation("Successfully read DB855.DBW0 = {Value}", value);
             return (true, value, string.Empty);
         }
@@ -42,7 +43,7 @@ public class DiagnosticService : IDiagnosticService
 
     public async Task<(bool success, string error)> WriteTestValuesAsync(int pumps, double pressure)
     {
-        using var plc = new Plc(CpuType.S7400, _plcWriteIp, 0, 2);
+        using var plc = new Plc(CpuType.S7400, _plcWriteIp, 0,3);
         try
         {
             await plc.OpenAsync();

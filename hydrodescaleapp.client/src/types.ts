@@ -1,6 +1,8 @@
 export interface SteelGrade {
-  Id: number;
-  SteelGradeName: string;
-  NumberOfPumps: number;
-  PressureSetting: number;
+  id: number;
+  steelGradeName: string;
+  numberOfPumps: number;
+  pressureSetting: number;
+  createdAt: string;
+  updatedAt: string;
 }

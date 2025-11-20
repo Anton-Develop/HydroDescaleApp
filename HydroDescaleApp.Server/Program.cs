@@ -13,8 +13,10 @@ namespace HydroDescaleApp.Server
 
       // Add services
       builder.Services.AddControllers();
-      builder.Services.AddEndpointsApiExplorer();
-      builder.Services.AddSwaggerGen();
+    
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
       builder.Services.AddDbContext<AppDbContext>(options =>
           options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -24,8 +26,19 @@ namespace HydroDescaleApp.Server
       builder.Services.AddScoped<IDiagnosticService, DiagnosticService>();
 
    
-builder.Services.AddSingleton<IPlcConnectionStateService, PlcConnectionStateService>();
+      builder.Services.AddSingleton<IPlcConnectionStateService, PlcConnectionStateService>();
       builder.Services.AddHostedService<PlcPollingService>();
+
+ // Добавить CORS
+      builder.Services.AddCors(options =>
+      {
+          options.AddPolicy("AllowReactApp", policy =>
+          {
+              policy.WithOrigins("https://localhost:37565") // URL вашего React-приложения
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+          });
+      });
 
       var app = builder.Build();
 
@@ -44,6 +57,7 @@ builder.Services.AddSingleton<IPlcConnectionStateService, PlcConnectionStateServ
       }
 
       app.UseHttpsRedirection();
+      app.UseCors("AllowReactApp");
       app.MapControllers();
 
       app.Run();

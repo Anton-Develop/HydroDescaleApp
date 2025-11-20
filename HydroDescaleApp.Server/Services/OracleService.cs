@@ -53,7 +53,7 @@ namespace HydroDescaleApp.Server.Services
         using var connection = new OracleConnection(_connectionString);
         await connection.OpenAsync();
 
-        using var command = new OracleCommand("SELECT SteelGrade FROM View_Descaling_Servise WHERE pos = :pos", connection);
+        using var command = new OracleCommand("SELECT SteelGrade FROM VIEW_DESCALING_SERVICE WHERE pos = :pos", connection);
         command.Parameters.Add(new OracleParameter("pos", OracleDbType.Int32) { Value = position });
 
         var result = await command.ExecuteScalarAsync();

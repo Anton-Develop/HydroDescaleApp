@@ -1,19 +1,21 @@
 using System.Threading.Tasks.Dataflow;
-using HydroDescaleApp.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using S7.Net;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using HydroDescaleApp.Server.Services;
+using HydroDescaleApp.Server.Data;
 
-namespace HydroDescaleApp.Server.Services;
+namespace HydroDescaleApp.Server.Services; // Убедитесь, что пространство имён правильное
 
 public class PlcPollingService : BackgroundService
 {
     private readonly ILogger<PlcPollingService> _logger;
-    private readonly AppDbContext _context;
-    private readonly IOracleService _oracleService;
     private readonly string _plcIp;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IConfiguration _configuration;
     private readonly int _dbNumber = 550;
     private readonly Dictionary<int, int> _positionMap = new()
     {
@@ -25,29 +27,25 @@ public class PlcPollingService : BackgroundService
         { 5, 67 }  // DBX0.5 -> pos 67 (right, furnace 3)
     };
 
-    // <-- Теперь отслеживаем изменение байта, а не watchdog
     private byte? _lastByteValue = null;
 
+    // ❌ УБРАТЬ IOracleService из параметров конструктора!
     public PlcPollingService(
         ILogger<PlcPollingService> logger,
-        AppDbContext context,
-        IOracleService oracleService,
+        IServiceScopeFactory scopeFactory,
         IConfiguration configuration)
     {
         _logger = logger;
-        _context = context;
-        _oracleService = oracleService;
+        _scopeFactory = scopeFactory;
         _plcIp = configuration["Plc:ReadIp"] ?? "127.0.0.1";
         _configuration = configuration;
     }
-
-    private readonly IConfiguration _configuration;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("PlcPollingService is starting.");
 
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(2000)); // Частый опрос для отслеживания изменений
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(5000));
 
         while (!stoppingToken.IsCancellationRequested && await timer.WaitForNextTickAsync(stoppingToken))
         {
@@ -66,25 +64,27 @@ public class PlcPollingService : BackgroundService
 
     private async Task PollPlcAsync()
     {
-        using var plc = new Plc(CpuType.S7400, _plcIp, 0, 2);
+        using var plc = new Plc(CpuType.S7400, _plcIp, 0,3); 
+        
         try
         {
+            
             await plc.OpenAsync();
+            
 
-            // Read DB550.DBB0 (contains DBX0.0 - DBX0.5)
-            var currentByteValue = (byte)plc.Read($"{_dbNumber}.DBB0");
 
+            // Read DB550.DBB0 (contains DBX0.0 - DBX0.5) {_dbNumber}
+            var currentByteValue = (byte)plc.Read($"DB550.DBB0");
+            
             // Check if byte value has changed
             if (_lastByteValue.HasValue && _lastByteValue.Value == currentByteValue)
             {
-                // Байт не изменился, выходим
                 return;
             }
 
             _logger.LogDebug("DBB0 changed from {_lastByteValue} to {currentByteValue}", _lastByteValue, currentByteValue);
             _lastByteValue = currentByteValue;
 
-            // Если байт изменился, ищем активный бит
             int? activeBit = null;
             for (int i = 0; i < 6; i++)
             {
@@ -100,28 +100,33 @@ public class PlcPollingService : BackgroundService
                 var pos = _positionMap[activeBit.Value];
                 _logger.LogInformation("Event: Active bit {Bit} changed, corresponding to position {Pos}", activeBit.Value, pos);
 
-                var steelGrade = await _oracleService.GetSteelGradeByPositionAsync(pos);
+                // Создаём scope для получения IOracleService и AppDbContext
+                using var scope = _scopeFactory.CreateScope();
+                var oracleService = scope.ServiceProvider.GetRequiredService<IOracleService>();
+
+                var steelGrade = await oracleService.GetSteelGradeByPositionAsync(pos);
                 if (!string.IsNullOrEmpty(steelGrade))
                 {
                     _logger.LogInformation("Steel grade '{Grade}' found for position {Pos}", steelGrade, pos);
 
-                    var settings = await _context.SteelGrades
+                    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                    var settings = await context.SteelGrades
                         .FirstOrDefaultAsync(s => s.SteelGradeName == steelGrade);
 
                     if (settings != null)
                     {
                         _logger.LogInformation("Settings found: Pumps={Pumps}, Pressure={Pressure}", settings.NumberOfPumps, settings.PressureSetting);
 
-                        // Send to PLC Закомментим пока не будет создано правильной DB
-                      //  var plcService = new PlcService(_configuration);
-                      //  await plcService.WriteDescaleSettingsAsync(settings.NumberOfPumps, settings.PressureSetting);
+                        // Send to PLC
+                    //    var plcService = scope.ServiceProvider.GetRequiredService<IPlcService>();
+                     //   await plcService.WriteDescaleSettingsAsync(settings.NumberOfPumps, settings.PressureSetting);
                     }
                     else
                     {
                         _logger.LogWarning("No settings found for steel grade '{Grade}', using defaults.", steelGrade);
-                        // Send to PLC Закомментим пока не будет создано правильной DB
-                       // var plcService = new PlcService(_configuration);
-                       // await plcService.WriteDescaleSettingsAsync(2, 18.3); // defaults
+                     //   var plcService = scope.ServiceProvider.GetRequiredService<IPlcService>();
+                     //   await plcService.WriteDescaleSettingsAsync(2, 18.3); // defaults
                     }
                 }
                 else
@@ -131,15 +136,13 @@ public class PlcPollingService : BackgroundService
             }
             else
             {
-                // Байт изменился, но ни один из интересующих битов не установлен.
-                // Это может быть, например, если установился бит 6 или 7, или все сброшены.
-                // Логируем, если это важно для отладки.
                 _logger.LogDebug("DBB0 changed, but no active bit found in DBX0.0 - DBX0.5. Current value: {currentByteValue}", currentByteValue);
             }
+            
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to communicate with PLC at {_plcIp}", _plcIp);
+            _logger.LogError(ex, "Ошибка коммуникации с PLC at {_plcIp}", _plcIp);
         }
     }
 }
