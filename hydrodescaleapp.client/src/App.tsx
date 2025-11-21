@@ -53,7 +53,7 @@ const App = () => {
 
   const fetchSteelGrades = async () => {
     try {
-      const res = await axios.get<SteelGrade[]>('https://localhost:5000/api/steelgrades');
+      const res = await axios.get<SteelGrade[]>('https://localhost:7015/api/steelgrades');
       setSteelGrades(res.data);
     } catch (err) {
       console.error(err);
@@ -99,7 +99,7 @@ const App = () => {
     setSyncMessage(null);
     setSyncError(null);
     try {
-      const res = await axios.post('https://localhost:5000/api/sync/load-steel-grades');
+      const res = await axios.post('https://localhost:7015/api/sync/load-steel-grades');
       setSyncMessage(res.data.message);
       fetchSteelGrades();
     } catch (err: any) {
@@ -109,7 +109,7 @@ const App = () => {
 
   const handleAdd = async () => {
     try {
-      await axios.post('https://localhost:5000/api/steelgrades', newGrade);
+      await axios.post('https://localhost:7015/api/steelgrades', newGrade);
       fetchSteelGrades();
       setNewGrade({ steelGradeName: '', numberOfPumps: 2, pressureSetting: 18.3 });
     } catch (err) {
@@ -119,7 +119,7 @@ const App = () => {
 
   const handleDelete = async (id: number) => {
     try {
-      await axios.delete(`https://localhost:5000/api/steelgrades/${id}`);
+      await axios.delete(`https://localhost:7015/api/steelgrades/${id}`);
       fetchSteelGrades();
     } catch (err) {
       console.error(err);
@@ -141,7 +141,8 @@ const App = () => {
   const handleSaveEdit = async () => {
     if (editRowData) {
       try {
-        await axios.put(`https://localhost:5000/api/steelgrades/${editRowData.id}`, {
+        await axios.put(`https://localhost:7015/api/steelgrades/${editRowData.id}`, {
+          id:editRowData.id,
           steelGradeName: steelGrades.find(g => g.id === editRowData.id)?.steelGradeName,
           numberOfPumps: editRowData.numberOfPumps,
           pressureSetting: editRowData.pressureSetting
@@ -178,8 +179,7 @@ const App = () => {
             >
               <option value={1}>1</option>
               <option value={2}>2</option>
-              <option value={3}>3</option>
-              <option value={4}>4</option>
+
             </select>
           );
         }

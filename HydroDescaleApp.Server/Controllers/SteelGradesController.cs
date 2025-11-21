@@ -44,6 +44,7 @@ namespace HydroDescaleApp.Server.Controllers
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateSteelGrade(int id, SteelGrade grade)
     {
+      
       if (id != grade.Id) return BadRequest();
       grade.UpdatedAt = DateTime.UtcNow;
       _context.Entry(grade).State = EntityState.Modified;
