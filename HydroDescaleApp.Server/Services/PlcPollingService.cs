@@ -19,7 +19,7 @@ public class PlcPollingService : BackgroundService
     private readonly int _dbNumber = 550;
     private readonly int _bitToWatch =6;
     private readonly Dictionary<int, int> _positionMap = new()
-    {
+    
         { 0, 59 }, // DBX0.0 -> pos 59 (left, furnace 1)
         { 1, 61 }, // DBX0.1 -> pos 61 (right, furnace 1)
         { 2, 62 }, // DBX0.2 -> pos 62 (left, furnace 2)
